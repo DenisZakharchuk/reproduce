@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch ClientAPI (http)",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/ClientAPI/src/ClientAPI/ClientAPI.csproj",
+            "launchSettingsProfile": "http",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Launch ClientAPI (https)",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/ClientAPI/src/ClientAPI/ClientAPI.csproj",
+            "launchSettingsProfile": "https",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Attach to ClientAPI",
+            "type": "dotnet",
+            "request": "attach"
+        }
+    ]
+}
