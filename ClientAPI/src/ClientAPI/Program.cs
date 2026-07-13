@@ -40,7 +40,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(options =>
     {
         options
-            .AddDocument("v1",     "Local API")
+            .AddDocument("v1", "Local API")
             .AddDocument("galaxy", "Scalar Galaxy (external)",
                 "https://registry.scalar.com/@scalar/apis/galaxy?format=json");
 
