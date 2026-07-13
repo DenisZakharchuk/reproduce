@@ -37,7 +37,17 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapScalarApiReference(options =>
+    {
+        options
+            .AddDocument("v1",     "Local API")
+            .AddDocument("galaxy", "Scalar Galaxy (external)",
+                "https://registry.scalar.com/@scalar/apis/galaxy?format=json");
+
+        // Routes test requests through a proxy to avoid browser CORS blocks
+        // when calling the external API. Use your own proxy for sensitive APIs.
+        options.WithProxy("https://proxy.scalar.com");
+    });
 }
 
 app.UseHttpsRedirection();
