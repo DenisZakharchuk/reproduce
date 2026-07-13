@@ -1,4 +1,5 @@
 using ClientAPI.Configuration;
+using ClientAPI.OpenApi;
 using ClientAPI.Services;
 using ClientAPI.Services.Integrations;
 using Scalar.AspNetCore;
@@ -9,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddScoped<ICodeSampleProvider, ExampleEndpointCodeSampleProvider>();
+builder.Services.AddOpenApi(options =>
+    options.AddOperationTransformer<CodeSamplesOperationTransformer>());
 
 // Options
 builder.Services.Configure<CoreDataServiceOptions>(builder.Configuration.GetSection("CoreDataService"));
