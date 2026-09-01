@@ -21,6 +21,8 @@ builder.Services.Configure<ScalarProxyOptions>(builder.Configuration.GetSection(
 // Services
 builder.Services.AddScoped<IApiSourceProvider, ConfigurationApiSourceProvider>();
 builder.Services.AddScoped<IUserAuthenticator, ConfigurationUserAuthenticator>();
+builder.Services.AddScoped<IApiSourceSpecService, ApiSourceSpecService>();
+builder.Services.AddHttpClient("ApiSourceSpecFetcher");
 
 // Authentication / authorization
 builder.Services
@@ -43,8 +45,22 @@ builder.Services
             context.Response.Redirect(context.RedirectUri);
             return Task.CompletedTask;
         };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
     });
 builder.Services.AddAuthorization();
+
+builder.Services.AddHttpClient("Gateway")
+.AddHttpMessageHandler<GatewayAuthenticationHandler>();
 
 var app = builder.Build();
 

@@ -28,7 +28,14 @@ internal static class ScalarDocumentComposer
             if (!isAllowed)
                 continue;
 
-            options.AddDocument(source.Id, source.Title, source.SpecUrl, isDefault: isFirst);
+            // Sources with "Environments" configured are served through a local
+            // rewriting endpoint that injects "x-scalar-environments" into the spec;
+            // everything else is loaded straight from its original SpecUrl.
+            var routePattern = source.RequiresSpecRewrite
+                ? $"/api/sources/{source.Id}/openapi.json"
+                : source.SpecUrl;
+
+            options.AddDocument(source.Id, source.Title, routePattern, isDefault: isFirst);
             isFirst = false;
         }
 
