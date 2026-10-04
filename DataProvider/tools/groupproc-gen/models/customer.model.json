@@ -1,0 +1,59 @@
+{
+    "sourceTable": "dbo.Customer",
+    "procName": "dbo.CustomersGrouped_Gen",
+    "columns": [
+        {
+            "name": "Name",
+            "type": "NVARCHAR(200)",
+            "grouping": "hard",
+            "nullable": false
+        },
+        {
+            "name": "Email",
+            "type": "NVARCHAR(320)",
+            "grouping": "hard",
+            "nullable": false
+        },
+        {
+            "name": "Status",
+            "type": "NVARCHAR(50)",
+            "grouping": "soft",
+            "filter": true
+        },
+        {
+            "name": "ConsumtionGroup",
+            "type": "NVARCHAR(100)",
+            "grouping": "soft"
+        },
+        {
+            "name": "PaymentData",
+            "type": "NVARCHAR(MAX)",
+            "grouping": "soft"
+        },
+        {
+            "name": "Id",
+            "type": "INT",
+            "grouping": "ignore"
+        }
+    ],
+    "output": [
+        "Name",
+        "Email",
+        "Status",
+        "ConsumtionGroup",
+        "PaymentData"
+    ],
+    "orderBy": [
+        "Name",
+        "Email",
+        "ConsumtionGroup",
+        "PaymentData",
+        "Status"
+    ],
+    "cache": {
+        "enabled": true,
+        "table": "dbo.CustomerGroupCache_Gen",
+        "refreshProc": "dbo.CustomerGroupCache_Gen_Refresh",
+        "pageProc": "dbo.CustomerGroupCache_Gen_Page"
+    }
+}

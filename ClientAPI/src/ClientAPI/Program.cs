@@ -19,6 +19,7 @@ builder.Services.AddOpenApi(options =>
 builder.Services.Configure<CoreDataServiceOptions>(builder.Configuration.GetSection("CoreDataService"));
 builder.Services.Configure<DbServiceOptions>(builder.Configuration.GetSection("DbService"));
 builder.Services.Configure<KeyProviderOptions>(builder.Configuration.GetSection("KeyProvider"));
+builder.Services.Configure<QueueManagementOptions>(builder.Configuration.GetSection("QueueManagement"));
 
 // HTTP clients
 builder.Services.AddHttpClient("OriginalCoreDataService");
@@ -68,6 +69,10 @@ builder.Services.AddScoped<IDbServiceClient, DbServiceClient>();
 
 // Services
 builder.Services.AddScoped<IExampleService, ExampleService>();
+
+// Queue management — register one keyed queue + dedicated background consumer per key (e.g. tenant):
+//   builder.Services.AddQueue<OrderMessage, OrderMessageHandler>("tenantA", "tenantB");
+// The producer picks the queue from the current ITenantContext at call time.
 
 var app = builder.Build();
 
