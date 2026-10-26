@@ -1,3 +1,4 @@
+using DataProvider.Binary;
 using DataProvider.Configuration;
 using DataProvider.Data;
 using DataProvider.Services;
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<IBinarySerializer, GzipJsonLinesBinarySerializer>();
+builder.Services.AddSingleton<IBinaryStorage, RedisBinaryStorage>();
 
 // Options
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection("Database"));

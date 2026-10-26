@@ -4,7 +4,11 @@ namespace DataProvider.Services;
 
 public interface ICustomerService
 {
-    Task<IReadOnlyList<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default);
+    IAsyncEnumerable<Customer> GetCustomersAsync(CancellationToken cancellationToken = default);
+
+    Task<string> InitExportAsync(CancellationToken cancellationToken = default);
+
+    Task<Stream?> OpenExportAsync(string exportId, CancellationToken cancellationToken = default);
 
     Task<Customer?> GetCustomerByIdAsync(int id, CancellationToken cancellationToken = default);
 

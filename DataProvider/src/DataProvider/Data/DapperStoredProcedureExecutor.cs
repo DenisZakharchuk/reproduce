@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 
 namespace DataProvider.Data;
@@ -10,6 +11,27 @@ public class DapperStoredProcedureExecutor : IStoredProcedureExecutor
     public DapperStoredProcedureExecutor(IDbConnectionFactory connectionFactory)
     {
         _connectionFactory = connectionFactory;
+    }
+
+    public async IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+        string procedureName,
+        object? parameters = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await using var connection = _connectionFactory.CreateConnection() as DbConnection
+            ?? throw new InvalidOperationException("The connection factory must return a DbConnection.");
+        await connection.OpenAsync(cancellationToken);
+
+        await foreach (var item in connection.QueryUnbufferedAsync<T>(
+            procedureName,
+            parameters,
+            commandType: CommandType.StoredProcedure)
+            .WithCancellation(cancellationToken)
+            .ConfigureAwait(false))
+        {
+            yield return item;
+        }
     }
 
     public async Task<IReadOnlyList<T>> QueryAsync<T>(

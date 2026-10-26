@@ -1,0 +1,7 @@
+@baseUrl = http://localhost:5100
+
+### Initialize customer export; follow the 307 redirect to download the gzip JSONL file
+GET {{baseUrl}}/api/customers/export/init
+
+### Download a customer export by its ID
+GET {{baseUrl}}/api/customers/export/0000000000000000000000000000000000000000000000000000000000000000

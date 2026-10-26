@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 namespace DataProvider.Data;
 
 /// <summary>
@@ -7,6 +9,11 @@ namespace DataProvider.Data;
 /// </summary>
 public interface IStoredProcedureExecutor
 {
+    IAsyncEnumerable<T> QueryUnbufferedAsync<T>(
+        string procedureName,
+        object? parameters = null,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<T>> QueryAsync<T>(
         string procedureName,
         object? parameters = null,

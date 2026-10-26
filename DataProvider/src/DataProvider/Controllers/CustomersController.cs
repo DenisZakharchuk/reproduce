@@ -8,6 +8,7 @@ namespace DataProvider.Controllers;
 [Route("api/[controller]")]
 public class CustomersController : ControllerBase
 {
+    private const string ExportRouteName = "CustomerExport";
     private readonly ICustomerService _customerService;
 
     public CustomersController(ICustomerService customerService)
@@ -18,8 +19,38 @@ public class CustomersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Customer>>> GetAsync(CancellationToken cancellationToken)
     {
-        var customers = await _customerService.GetCustomersAsync(cancellationToken);
+        var customers = new List<Customer>();
+        await foreach (var customer in _customerService.GetCustomersAsync(cancellationToken)
+            .WithCancellation(cancellationToken))
+        {
+            customers.Add(customer);
+        }
+
         return Ok(customers);
+    }
+
+    [HttpGet("export/init")]
+    [ProducesResponseType(StatusCodes.Status307TemporaryRedirect)]
+    public async Task<IActionResult> InitExportAsync(    CancellationToken cancellationToken)
+    {
+    var exportId = await _customerService.InitExportAsync(cancellationToken);
+    var exportUrl = Url.RouteUrl(ExportRouteName, new { exportId });
+
+    if (exportUrl is null)
+        throw new InvalidOperationException("Unable to generate the customer export URL.");
+
+        return RedirectPreserveMethod(exportUrl);
+    }
+
+    [HttpGet("export/{exportId}", Name = ExportRouteName)]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportAsync(string exportId, CancellationToken cancellationToken)
+    {
+        var stream = await _customerService.OpenExportAsync(exportId, cancellationToken);
+        return stream is null
+            ? NotFound()
+            : File(stream, "application/gzip", $"customers-{exportId}.jsonl.gz");
     }
 
     [HttpGet("{id:int}")]
