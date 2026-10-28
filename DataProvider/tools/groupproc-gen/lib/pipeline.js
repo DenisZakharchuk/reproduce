@@ -19,28 +19,49 @@ function distinctCreate(model) {
 
 function distinctInsert(model, withFilter) {
     const insertCols = [...model.hard, ...model.soft].map((c) => ident(c.name));
+    const splitColumns = model.soft.filter((c) => c.split);
+    const splitAliases = new Map(splitColumns.map((c, i) => [c.name, `split${i}`]));
+    const sourceExpr = (c) => {
+        const splitAlias = splitAliases.get(c.name);
+        if (splitAlias) return `${splitAlias}.[Value]`;
+        return c.grouping === 'soft' ? softNormalizeExpr(c, 'src') : `src.${ident(c.name)}`;
+    };
     const selectExprs = [
-        ...model.hard.map((c) => ident(c.name)),
-        ...model.soft.map((c) => softNormalizeExpr(c)),
+        ...model.hard.map(sourceExpr),
+        ...model.soft.map(sourceExpr),
         'COUNT_BIG(*)',
     ];
     const groupExprs = [
-        ...model.hard.map((c) => ident(c.name)),
-        ...model.soft.map((c) => softNormalizeExpr(c)),
+        ...model.hard.map(sourceExpr),
+        ...model.soft.map(sourceExpr),
     ];
 
     let where = '';
     if (withFilter && model.filters.length) {
         const preds = model.filters.map(
-            (c) => `(@${c.name} IS NULL OR ${ident(c.name)} = @${c.name})`
+            (c) => `(@${c.name} IS NULL OR src.${ident(c.name)} = @${c.name})`
         );
         where = `\nWHERE ${preds.join('\n  AND ')}`;
     }
 
+    const applies = splitColumns.map((c, i) => {
+        const alias = `split${i}`;
+        const delimiter = c.split.delimiter.replace(/'/g, "''");
+        const token = `NULLIF(LTRIM(RTRIM(tokens.[value])), N'')`;
+        return [
+            `OUTER APPLY (`,
+            `    SELECT DISTINCT ${token} AS [Value]`,
+            `    FROM STRING_SPLIT(src.${ident(c.name)}, N'${delimiter}') AS tokens`,
+            `    WHERE ${token} IS NOT NULL`,
+            `) AS ${alias}`,
+        ].join('\n');
+    });
+    const from = [`FROM ${qualify(model.sourceTable)} AS src`, ...applies].join('\n');
+
     return [
         `INSERT INTO #Distinct (${insertCols.join(', ')}, Cnt)`,
         `SELECT ${selectExprs.join(', ')}`,
-        `FROM ${qualify(model.sourceTable)}${where}`,
+        from + where,
         `GROUP BY ${groupExprs.join(', ')};`,
     ].join('\n');
 }

@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace DataProvider.Binary;
 
@@ -13,6 +15,9 @@ public sealed class GzipJsonLinesBinarySerializer : IBinarySerializer
     {
         _jsonOptions = jsonOptions is null
             ? new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            }
             : new JsonSerializerOptions(jsonOptions);
     }
 

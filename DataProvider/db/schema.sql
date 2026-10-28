@@ -87,12 +87,10 @@ GO
 --     picked for output. A wildcard row fans out into every compatible group, so it can
 --     be counted in more than one MemberCount. Id is ignored entirely.
 -- @Status is an optional filter: when supplied, only rows with that Status are considered.
--- Set-based (no cursors): the base table is collapsed to its distinct (Name,Email,CG,PD,ST)
--- combinations ONCE into #Distinct (single scan, carrying the row count). All option /
--- candidate / compatibility work then runs on that compact set, and MemberCount is the
--- summed row count. Per (Name,Email) partition, each soft column's option set is its
--- distinct non-null values (or a single NULL when none exist); candidate groups are the
--- cross product, and an INNER JOIN on compatibility prunes impossible combinations.
+-- ConsumtionGroup is split on commas before pre-aggregation; duplicate tokens within a
+-- source row count once, and rows with no non-empty token contribute one NULL wildcard.
+-- The base table is then collapsed to distinct (Name,Email,CG,PD,ST) combinations in
+-- #Distinct, carrying row counts for the existing soft wildcard grouping pipeline.
 CREATE OR ALTER PROCEDURE dbo.CustomersGrouped
 @Offset INT, @PageSize INT, @Status NVARCHAR (50)=NULL
 AS
@@ -114,16 +112,19 @@ BEGIN
         ST,
         Cnt
     )
-    SELECT   Name,
-             Email,
-             NULLIF (LTRIM(RTRIM(ConsumtionGroup)), N''),
-             NULLIF (LTRIM(RTRIM(PaymentData)), N''),
-             NULLIF (LTRIM(RTRIM(Status)), N''),
+    SELECT   c.Name,
+             c.Email,
+             split.CG,
+             NULLIF (LTRIM(RTRIM(c.PaymentData)), N''),
+             NULLIF (LTRIM(RTRIM(c.Status)), N''),
              COUNT_BIG(*)
-    FROM     dbo.Customer
+    FROM     dbo.Customer AS c
+             OUTER APPLY (SELECT DISTINCT NULLIF (LTRIM(RTRIM(s.value)), N'') AS CG
+                          FROM   STRING_SPLIT (c.ConsumtionGroup, N',') AS s
+                          WHERE  NULLIF (LTRIM(RTRIM(s.value)), N'') IS NOT NULL) AS split
     WHERE    @Status IS NULL
-             OR Status = @Status
-    GROUP BY Name, Email, NULLIF (LTRIM(RTRIM(ConsumtionGroup)), N''), NULLIF (LTRIM(RTRIM(PaymentData)), N''), NULLIF (LTRIM(RTRIM(Status)), N'');
+             OR c.Status = @Status
+    GROUP BY c.Name, c.Email, split.CG, NULLIF (LTRIM(RTRIM(c.PaymentData)), N''), NULLIF (LTRIM(RTRIM(c.Status)), N'');
     CREATE NONCLUSTERED INDEX IX_Distinct
         ON #Distinct(Name, Email);
     WITH     Partitions

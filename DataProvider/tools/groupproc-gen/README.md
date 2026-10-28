@@ -25,6 +25,7 @@ Requires Node.js only (no `npm install`).
   "columns": [
     { "name": "Name",  "type": "NVARCHAR(200)", "grouping": "hard", "nullable": false },
     { "name": "Status","type": "NVARCHAR(50)",  "grouping": "soft", "filter": true },
+    { "name": "ConsumtionGroup", "type": "NVARCHAR(100)", "grouping": "soft", "split": { "delimiter": "," } },
     { "name": "Id",    "type": "INT",           "grouping": "ignore" }
   ],
   "output":  ["Name", "Status"],               // result column order (default: grouping cols)
@@ -44,6 +45,13 @@ Requires Node.js only (no `npm install`).
 | `hard`     | Exact match; part of the partition key. Set `nullable: true` for null-safe matching (`IS NOT DISTINCT FROM`, SQL Server 2022+). |
 | `soft`     | Null/empty is a wildcard; distinct non-null values split into separate groups; the non-null value is picked for output. Normalized with `NULLIF(LTRIM(RTRIM(x)), N'')` unless `normalize: false`. |
 | `ignore`   | Omitted entirely (e.g. identity/`Id`). |
+
+Any `soft` column may additionally specify `"split": { "delimiter": "," }`.
+The generator expands each source row into one row per distinct, trimmed, non-empty
+token before pre-aggregation. Duplicate tokens within a source row count once; if
+the value is null, empty, or contains no non-empty tokens, it contributes one NULL
+wildcard row. The delimiter must be one character. Both the OFFSET procedure and
+the cache refresh use this expansion.
 
 `filter: true` adds an optional `@<col>` parameter. In the OFFSET proc it filters
 the base rows **before** grouping; in the cache page proc it filters the cached

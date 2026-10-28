@@ -30,6 +30,19 @@ function parseModel(raw) {
         if (c.grouping !== 'ignore' && !c.type) {
             throw fail(`columns[${i}] '${c.name}': type is required for ${c.grouping} columns.`);
         }
+        let split = null;
+        if (c.split !== undefined && c.split !== false) {
+            if (c.grouping !== 'soft') {
+                throw fail(`columns[${i}] '${c.name}': split is only supported for soft columns.`);
+            }
+            const delimiter = typeof c.split === 'object' && c.split !== null
+                ? c.split.delimiter
+                : c.split === true ? ',' : c.split;
+            if (typeof delimiter !== 'string' || delimiter.length !== 1) {
+                throw fail(`columns[${i}] '${c.name}': split delimiter must be one character.`);
+            }
+            split = { delimiter };
+        }
         return {
             name: c.name,
             type: c.type,
@@ -37,6 +50,7 @@ function parseModel(raw) {
             nullable: c.nullable !== undefined ? !!c.nullable : c.grouping === 'soft',
             filter: !!c.filter,
             normalize: c.normalize !== undefined ? !!c.normalize : true,
+            split,
         };
     });
 
