@@ -1,6 +1,8 @@
 # Build outputs
 **/bin/
 **/obj/
+DevAzure/node_modules/
+DevAzure/dist/
 
 # User-specific files
 *.user
