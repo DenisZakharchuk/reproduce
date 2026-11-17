@@ -61,6 +61,9 @@ rows **after** grouping (semantically different — see `schema.sql` notes).
 
 - `MemberCount` is `SUM` of source rows per group; a wildcard row compatible with
   several groups is counted in each (same trade-off as the hand-written procs).
+- A candidate group must be an observed normalized soft-value tuple in its hard
+  partition. Wildcard rows can contribute to an observed tuple, but two partial
+  rows cannot synthesize a new tuple by supplying different non-empty values.
 - Validation errors (no hard column, duplicate name, bad `grouping`, missing cache
   config) print a message and exit non-zero.
 - Output targets functional equivalence with the hand-written procs, not

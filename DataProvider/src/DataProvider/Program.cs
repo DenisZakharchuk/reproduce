@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IDistributedAsyncLock, RedisDistributedAsyncLock>(
 
 // Services
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ISyncLockService, SyncLockService>();
 
 var app = builder.Build();
 

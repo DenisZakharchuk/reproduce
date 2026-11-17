@@ -25,6 +25,140 @@ IF OBJECT_ID('dbo.Customer', 'U') IS NULL
 
 
 GO
+IF OBJECT_ID('dbo.SyncLockHistory', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.SyncLockHistory (
+            Tenant   NVARCHAR (100) NOT NULL,
+            SyncDate DATE           NOT NULL,
+            ExpiredOn DATETIME2 (7) NOT NULL,
+            Status   NVARCHAR (10)  NOT NULL,
+            CONSTRAINT UQ_SyncLockHistory_Tenant_SyncDate UNIQUE (Tenant, SyncDate),
+            CONSTRAINT CK_SyncLockHistory_Status CHECK (Status IN (N'Running', N'Done', N'Failed'))
+        );
+    END
+
+
+GO
+CREATE OR ALTER PROCEDURE dbo.usp_AcquireSyncLock
+@Tenant NVARCHAR (100), @SyncDate DATE, @LeaseDurationMinutes INT=10
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @LeaseDurationMinutes <= 0
+        THROW 50001, 'Lease duration must be greater than zero.', 1;
+
+    DECLARE @Now DATETIME2 (7) = SYSUTCDATETIME();
+    DECLARE @ExpiredOn DATETIME2 (7);
+    DECLARE @Status NVARCHAR (10);
+    DECLARE @Acquired BIT = 0;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SELECT @ExpiredOn = ExpiredOn,
+               @Status = Status
+        FROM   dbo.SyncLockHistory WITH (UPDLOCK, HOLDLOCK)
+        WHERE  Tenant = @Tenant
+               AND SyncDate = @SyncDate;
+
+        IF @Status IS NULL
+            BEGIN
+                SET @ExpiredOn = DATEADD(MINUTE, @LeaseDurationMinutes, @Now);
+                SET @Status = N'Running';
+                INSERT INTO dbo.SyncLockHistory (Tenant, SyncDate, ExpiredOn, Status)
+                VALUES (@Tenant, @SyncDate, @ExpiredOn, @Status);
+                SET @Acquired = 1;
+            END
+        ELSE IF @Status = N'Failed'
+                OR (@Status = N'Running'
+                    AND @ExpiredOn <= @Now)
+            BEGIN
+                SET @ExpiredOn = DATEADD(MINUTE, @LeaseDurationMinutes, @Now);
+                SET @Status = N'Running';
+                UPDATE dbo.SyncLockHistory
+                SET    ExpiredOn = @ExpiredOn,
+                       Status = @Status
+                WHERE  Tenant = @Tenant
+                       AND SyncDate = @SyncDate;
+                SET @Acquired = 1;
+            END
+
+        COMMIT TRANSACTION;
+
+        SELECT @Acquired AS Acquired,
+               @Tenant AS Tenant,
+               @SyncDate AS SyncDate,
+               @ExpiredOn AS ExpiredOn,
+               @Status AS Status;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+
+
+GO
+CREATE OR ALTER PROCEDURE dbo.usp_ReleaseSyncLock
+@Tenant NVARCHAR (100), @SyncDate DATE, @Status NVARCHAR (10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @Status NOT IN (N'Done', N'Failed')
+        THROW 50002, 'Release status must be Done or Failed.', 1;
+
+    DECLARE @CurrentStatus NVARCHAR (10);
+    DECLARE @ExpiredOn DATETIME2 (7);
+    DECLARE @Released BIT = 0;
+    DECLARE @WasAlreadyReleased BIT = 0;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        SELECT @CurrentStatus = Status,
+               @ExpiredOn = ExpiredOn
+        FROM   dbo.SyncLockHistory WITH (UPDLOCK, HOLDLOCK)
+        WHERE  Tenant = @Tenant
+               AND SyncDate = @SyncDate;
+
+        IF @CurrentStatus = @Status
+            BEGIN
+                SET @Released = 1;
+                SET @WasAlreadyReleased = 1;
+            END
+        ELSE IF @CurrentStatus = N'Running'
+            BEGIN
+                UPDATE dbo.SyncLockHistory
+                SET    Status = @Status
+                WHERE  Tenant = @Tenant
+                       AND SyncDate = @SyncDate;
+                SET @CurrentStatus = @Status;
+                SET @Released = 1;
+            END
+
+        COMMIT TRANSACTION;
+
+        SELECT @Released AS Released,
+               @WasAlreadyReleased AS WasAlreadyReleased,
+               @Tenant AS Tenant,
+               @SyncDate AS SyncDate,
+               @ExpiredOn AS ExpiredOn,
+               @CurrentStatus AS Status;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+
+
+GO
 -- Idempotent add for databases created before Status existed.
 IF COL_LENGTH('dbo.Customer', 'Status') IS NULL
     ALTER TABLE dbo.Customer

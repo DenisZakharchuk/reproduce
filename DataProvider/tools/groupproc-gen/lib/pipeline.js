@@ -71,36 +71,25 @@ function distinctIndex(model) {
     return `CREATE NONCLUSTERED INDEX IX_Distinct ON #Distinct (${hardNames});`;
 }
 
-function optionsCte(model, col) {
-    const hardIdents = model.hard.map((h) => ident(h.name)).join(', ');
-    const pHard = model.hard.map((h) => `p.${ident(h.name)}`).join(', ');
+function candidatesCte(model) {
+    const sel = [...model.hard, ...model.soft].map((c) => `source.${ident(c.name)}`).join(', ');
+    const eligible = model.soft.map((c) => [
+        `(`,
+        `${IND}source.${ident(c.name)} IS NOT NULL`,
+        `${IND}OR NOT EXISTS (`,
+        `${IND}${IND}SELECT 1 FROM #Distinct AS concrete`,
+        `${IND}${IND}WHERE ${hardPredicates('concrete', 'source', model.hard)}`,
+        `${IND}${IND}AND concrete.${ident(c.name)} IS NOT NULL)`,
+        `)`,
+    ].join('\n'));
+
     return [
-        `${col.name}Options AS (`,
-        `${IND}SELECT DISTINCT ${hardIdents}, ${ident(col.name)} AS Value`,
-        `${IND}FROM #Distinct`,
-        `${IND}WHERE ${ident(col.name)} IS NOT NULL`,
-        `${IND}UNION ALL`,
-        `${IND}SELECT ${pHard}, CAST(NULL AS ${col.type})`,
-        `${IND}FROM Partitions AS p`,
-        `${IND}WHERE NOT EXISTS (`,
-        `${IND}${IND}SELECT 1 FROM #Distinct AS d`,
-        `${IND}${IND}WHERE ${hardPredicates('d', 'p', model.hard)} AND d.${ident(col.name)} IS NOT NULL)`,
+        `Candidates AS (`,
+        `${IND}SELECT DISTINCT ${sel}`,
+        `${IND}FROM #Distinct AS source`,
+        `${IND}WHERE ${eligible.join(`\n${IND}AND `)}`,
         `)`,
     ].join('\n');
-}
-
-function candidatesCte(model) {
-    const sel = [
-        ...model.hard.map((h) => `o0.${ident(h.name)}`),
-        ...model.soft.map((s, i) => `o${i}.Value AS ${ident(s.name)}`),
-    ].join(', ');
-
-    const from = [`${IND}FROM ${model.soft[0].name}Options AS o0`];
-    for (let i = 1; i < model.soft.length; i++) {
-        from.push(`${IND}JOIN ${model.soft[i].name}Options AS o${i} ON ${hardPredicates(`o${i}`, 'o0', model.hard)}`);
-    }
-
-    return [`Candidates AS (`, `${IND}SELECT ${sel}`, ...from, `)`].join('\n');
 }
 
 function groupedCte(model) {
@@ -131,8 +120,6 @@ function groupedCte(model) {
 // Full "WITH Partitions, <col>Options..., Candidates, Grouped" block (no terminal).
 function withCtes(model) {
     const parts = [
-        `Partitions AS (\n${IND}SELECT DISTINCT ${model.hard.map((h) => ident(h.name)).join(', ')} FROM #Distinct\n)`,
-        ...model.soft.map((c) => optionsCte(model, c)),
         candidatesCte(model),
         groupedCte(model),
     ];
